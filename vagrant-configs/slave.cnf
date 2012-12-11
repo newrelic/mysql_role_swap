@@ -6,6 +6,7 @@ user=mysql
 symbolic-links=0
 
 log-bin      = mysql-binlog
+port         = 3307
 bind-address = 0.0.0.0
 server-id    = 2
 
