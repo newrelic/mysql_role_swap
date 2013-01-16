@@ -553,13 +553,6 @@ class MysqlSwitchRoleContext
     end
   end
 
-  def pause_traffic
-    `touch /tmp/hold`
-    sleep 1
-    puts "Paused proxy traffic....OK"
-    @statemachine.traffic_paused
-  end
-
   def remove_vip
     if @master
       if @master.remove_vip
@@ -652,7 +645,6 @@ class MysqlSwitchRoleContext
   def arping_from_slave
     if @slave.arping
       puts "Arping 4x....OK"
-#      @statemachine.demote_old_master_to_slave
       @statemachine.start_proxy_service_on_slave
     else
       puts "Arping 4x....Fail"
@@ -681,13 +673,6 @@ class MysqlSwitchRoleContext
         exit EXIT_WARNING
       end
     end
-  end
-
-  def unpause_traffic
-    `rm -rf /tmp/hold`
-    sleep 1
-    puts "Unpaused proxy traffic....OK"
-    @statemachine.traffic_unpaused
   end
 
   def demote_old_master_to_slave
@@ -811,13 +796,9 @@ mysql_switch_role = Statemachine.build do
     on_entry :preflight_verify
   end
   state :cluster_ready do
-    event :start_switching_roles, :pause_traffic, Proc.new { puts "Switching Roles:\n\n".white }
+    event :start_switching_roles, :switch_roles, Proc.new { puts "Switching Roles:\n\n".white }
     event :exit, :exit, Proc.new { puts "\nFAIL: We are SO done here. You said NO.\n" }
     on_entry :prompt_user
-  end
-  state :pause_traffic do
-    event :traffic_paused, :switch_roles
-    on_entry :pause_traffic
   end
   state :switch_roles do
     event :next_set_read_only, :do_set_read_only
