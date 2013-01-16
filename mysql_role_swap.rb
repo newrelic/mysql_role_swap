@@ -172,6 +172,19 @@ class DatabaseOne < ActiveRecord::Base
    end
  end
 
+ def self.proxy_role
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} status`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} status'`
+   end
+   if $?.exitstatus == 0
+    "master"
+  else
+    "slave"
+   end
+ end
+
  def self.start_proxy
    if self.config['host'] == `hostname`.chomp
      `sudo /sbin/service #{self.config['proxy_service']} start`
@@ -258,8 +271,10 @@ class DatabaseOne < ActiveRecord::Base
   def self.print_info
     printf "%-22s: %s:%d\n", self.role.capitalize, self.hostname, self.config['port']
     puts "MySQL Replication Role: #{self.mysql_rep_role}"
+    puts "Proxy Service Role    : #{self.proxy_role}"
     puts "Floating IP Role      : #{self.ip_role}"
     puts "Floating IP Interface : #{self.floating_dev}"
+    puts "Proxy Service Role    : #{self.proxy_role}"
     puts "MySQL Version         : [#{self.version}]"
     puts "Read-Only             : #{self.read_only?}"
     puts "Arping Path           : #{self.arping_path}"
@@ -335,6 +350,19 @@ class DatabaseTwo < ActiveRecord::Base
     true
   else
     false
+   end
+ end
+
+ def self.proxy_role
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} status`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} status'`
+   end
+   if $?.exitstatus == 0
+    "master"
+  else
+    "slave"
    end
  end
 
@@ -424,6 +452,7 @@ class DatabaseTwo < ActiveRecord::Base
   def self.print_info
     printf "%-22s: %s:%d\n", self.role.capitalize, self.hostname, self.config['port']
     puts "MySQL Replication Role: #{self.mysql_rep_role}"
+    puts "Proxy Service Role    : #{self.proxy_role}"
     puts "Floating IP Role      : #{self.ip_role}"
     puts "Floating IP Interface : #{self.floating_dev}"
     puts "MySQL Version         : [#{self.version}]"
