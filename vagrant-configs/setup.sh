@@ -17,7 +17,7 @@ echo "Stopping firewall..."
 service iptables stop 2>&1 >> /dev/null
 
 # Install the epel repo if not already available
-rpm -q --quiet epel-release || rpm -iv http://mirror.vcu.edu/pub/gnu+linux/epel/6/i386/epel-release-6-7.noarch.rpm
+rpm -q --quiet epel-release || rpm -iv http://download.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm
 
 # Make sure that required packages are installed
 echo "Verifying required packages are installed..."
@@ -49,7 +49,7 @@ fi
 
 if [ ! -L /etc/haproxy/haproxy.cfg ]; then
   rm -f /etc/haproxy/haproxy.cfg
-  ln -s /vagrant/vagrant-configs/haproxy.cfg /etc/haproxy/haproxy.cfg
+  ln -s /vagrant/vagrant-configs/haproxy-${ROLE}.cfg /etc/haproxy/haproxy.cfg
 fi
 
 # Setup one system to be a slave to start with
@@ -74,7 +74,5 @@ if [ "${ROLE}" == "master" ]; then
   fi
   echo "Verifying HAProxy is running..."
   service haproxy status 2>&1 > /dev/null || service haproxy start 2>&1 > /dev/null
-  echo "Disabling HAProxy instance for test-mysql-2..."
-  echo "disable server test-mysql/test-mysql-2" | socat stdio /var/lib/haproxy/stats
 fi
 

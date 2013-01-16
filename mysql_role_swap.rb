@@ -172,6 +172,32 @@ class DatabaseOne < ActiveRecord::Base
    end
  end
 
+ def self.start_proxy
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} start`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} start'`
+   end
+   if $?.exitstatus == 0
+    true
+  else
+    false
+   end
+ end
+
+ def self.stop_proxy
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} stop`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} stop'`
+   end
+   if $?.exitstatus == 0
+    true
+  else
+    false
+   end
+ end
+
  def self.arping_path
    `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/arping -V 2> /dev/null'`
    if $?.exitstatus == 0
@@ -236,7 +262,8 @@ class DatabaseOne < ActiveRecord::Base
     puts "Floating IP Interface : #{self.floating_dev}"
     puts "MySQL Version         : [#{self.version}]"
     puts "Read-Only             : #{self.read_only?}"
-    puts "Arping Path           : #{self.arping_path}\n\n"
+    puts "Arping Path           : #{self.arping_path}"
+    puts "Proxy Service         : #{self.config['proxy_service']}\n\n"
   end
 
 end
@@ -311,6 +338,32 @@ class DatabaseTwo < ActiveRecord::Base
    end
  end
 
+ def self.start_proxy
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} start`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} start'`
+   end
+   if $?.exitstatus == 0
+    true
+  else
+    false
+   end
+ end
+
+ def self.stop_proxy
+   if self.config['host'] == `hostname`.chomp
+     `sudo /sbin/service #{self.config['proxy_service']} stop`
+   else
+     `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/service #{self.config['proxy_service']} stop'`
+   end
+   if $?.exitstatus == 0
+    true
+  else
+    false
+   end
+ end
+
  def self.arping_path
    `ssh #{SSH_OPTIONS} #{self.config['host']} 'sudo /sbin/arping -V 2> /dev/null'`
    if $?.exitstatus == 0
@@ -375,7 +428,8 @@ class DatabaseTwo < ActiveRecord::Base
     puts "Floating IP Interface : #{self.floating_dev}"
     puts "MySQL Version         : [#{self.version}]"
     puts "Read-Only             : #{self.read_only?}"
-    puts "Arping Path           : #{self.arping_path}\n\n"
+    puts "Arping Path           : #{self.arping_path}"
+    puts "Proxy Service         : #{self.config['proxy_service']}\n\n"
   end
 
 end
@@ -598,10 +652,34 @@ class MysqlSwitchRoleContext
   def arping_from_slave
     if @slave.arping
       puts "Arping 4x....OK"
-      @statemachine.demote_old_master_to_slave
+#      @statemachine.demote_old_master_to_slave
+      @statemachine.start_proxy_service_on_slave
     else
       puts "Arping 4x....Fail"
       @statemachine.failed_to_arping
+    end
+  end
+
+  def start_proxy_service_on_slave
+    if @slave.start_proxy
+      puts "Start proxy service on new Master (existing slave)....OK"
+      @statemachine.stop_proxy_service_on_master
+    else
+      puts "Start proxy service on new Master (existing slave)....Fail"
+      @statemachine.failed_to_start_proxy
+      exit EXIT_WARNING
+    end
+  end
+  def stop_proxy_service_on_master
+    if @master
+      if @master.stop_proxy
+        puts "Stop proxy service on old Master....OK"
+        @statemachine.proxy_stopped
+      else
+        puts "Stop proxy service on old Master....OK"
+        @statemachine.failed_to_stop_proxy
+        exit EXIT_WARNING
+      end
     end
   end
 
@@ -771,13 +849,19 @@ mysql_switch_role = Statemachine.build do
   #At some point need to diverge paths here and rollback if this fails.
   #We keep on going because *of course* worked...
   state :do_arping do
-    event :demote_old_master_to_slave, :unpause_traffic
+    event :start_proxy_service_on_slave, :start_proxy_service_on_slave
     event :failed_to_arping, :vip_arping_fail, Proc.new { puts "Failed to arping 4x from slave....FAIL".red}
     on_entry :arping_from_slave
   end
-  state :unpause_traffic do
-    event :traffic_unpaused, :demote_old_master_to_slave
-    on_entry :unpause_traffic
+  state :start_proxy_service_on_slave do
+    event :stop_proxy_service_on_master, :stop_proxy_service_on_master
+    event :failed_to_start_proxy, :failed_to_stop_proxy, Proc.new { puts "Failed to start or stop proxy service....FAIL".red}
+    on_entry :start_proxy_service_on_slave
+  end
+  state :stop_proxy_service_on_master do
+    event :proxy_stopped, :demote_old_master_to_slave
+    event :failed_to_start_proxy, :failed_to_stop_proxy, Proc.new { puts "Failed to start or stop proxy service....FAIL".red}
+    on_entry :stop_proxy_service_on_master
   end
   state :demote_old_master_to_slave do
     event :verify_slave_catches_up, :verify_slave_catches_up

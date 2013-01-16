@@ -11,9 +11,10 @@ database_one:
   username: root
 #  password: rootpw
   host: 192.168.50.31
-  port: 3306
+  port: 3307
   slave_password: slavepw
   floating_dev: eth1
+  proxy_service: haproxy
 
 database_two:
   adapter: mysql
@@ -21,7 +22,8 @@ database_two:
   username: root
 #  password: rootpw
   host: 192.168.50.32
-  port: 3306
+  port: 3307
   slave_password: slavepw
   floating_dev: eth1
+  proxy_service: haproxy
 
